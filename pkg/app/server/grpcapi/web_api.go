@@ -1373,14 +1373,31 @@ func (a *WebAPI) ListAPIKeys(ctx context.Context, req *webservice.ListAPIKeysReq
 
 // GetInsightData returns the accumulated insight data.
 func (a *WebAPI) GetInsightData(ctx context.Context, req *webservice.GetInsightDataRequest) (*webservice.GetInsightDataResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "")
-	// claims, err := rpcauth.ExtractClaims(ctx)
-	// if err != nil {
-	// 	a.logger.Error("failed to authenticate the current user", zap.Error(err))
-	// 	return nil, err
-	// }
+	claims, err := rpcauth.ExtractClaims(ctx)
+	if err != nil {
+		a.logger.Error("failed to authenticate the current user", zap.Error(err))
+		return nil, err
+	}
 
-	// from := time.Unix(req.RangeFrom, 0)
+	switch req.MetricsKind {
+	case model.InsightMetricsKind_DEPLOYMENT_FREQUENCY:
+		points, updatedAt, err := a.getDeploymentFrequency(ctx, claims.Role.ProjectId, &model.ChunkDateRange{
+			From: req.RangeFrom,
+			To:   req.RangeTo,
+		})
+		if err != nil {
+			return nil, err
+		}
+		return &webservice.GetInsightDataResponse{
+			UpdatedAt: updatedAt,
+			Type:      model.InsightResultType_MATRIX,
+			Matrix: []*model.InsightSampleStream{
+				{DataPoints: points},
+			},
+		}, nil
+	default:
+		return nil, status.Error(codes.Unimplemented, "")
+	}
 
 	// chunks, err := insightstore.LoadChunksFromCache(a.insightCache, claims.Role.ProjectId, req.ApplicationId, req.MetricsKind, req.Step, from, count)
 	// if err != nil {
@@ -1419,6 +1436,28 @@ func (a *WebAPI) GetInsightData(ctx context.Context, req *webservice.GetInsightD
 	// 		},
 	// 	},
 	// }, nil
+}
+
+func (a *WebAPI) getDeploymentFrequency(ctx context.Context, projectID string, dateRange *model.ChunkDateRange) ([]*model.InsightDataPoint, int64, error) {
+	deployments, err := a.insightStore.GetDailyDeployments(ctx, projectID, dateRange)
+	var updatedAt int64
+	if err != nil {
+		return nil, updatedAt, err
+	}
+
+	result := make([]*model.InsightDataPoint, 0, len(deployments))
+	for _, d := range deployments {
+		if updatedAt < d.UpdatedAt {
+			updatedAt = d.UpdatedAt
+		}
+
+		result = append(result, &model.InsightDataPoint{
+			Timestamp: d.Date,
+			Value:     float32(len(d.DailyDeployments)),
+		})
+	}
+
+	return result, updatedAt, nil
 }
 
 func (a *WebAPI) GetInsightApplicationCount(ctx context.Context, req *webservice.GetInsightApplicationCountRequest) (*webservice.GetInsightApplicationCountResponse, error) {
