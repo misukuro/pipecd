@@ -89,16 +89,16 @@ func (c *Collector) Run(ctx context.Context) error {
 		c.logger.Info("added a cron job for collecting application metrics")
 	}
 
-	// if c.config.Deployment.Enabled {
-	// 	_, err := cr.AddFunc(c.config.Deployment.Schedule, func() {
-	// 		c.collectDeploymentMetrics(ctx)
-	// 	})
-	// 	if err != nil {
-	// 		c.logger.Error("failed to configure cron job for collecting deployment metrics", zap.Error(err))
-	// 		return err
-	// 	}
-	// 	c.logger.Info("added a cron job for collecting deployment metrics")
-	// }
+	if c.config.Deployment.Enabled {
+		_, err := cr.AddFunc(c.config.Deployment.Schedule, func() {
+			c.collectDeploymentMetrics(ctx)
+		})
+		if err != nil {
+			c.logger.Error("failed to configure cron job for collecting deployment metrics", zap.Error(err))
+			return err
+		}
+		c.logger.Info("added a cron job for collecting deployment metrics")
+	}
 
 	cr.Start()
 	<-ctx.Done()
@@ -143,7 +143,7 @@ func (c *Collector) collectDeploymentMetrics(ctx context.Context) {
 	cfg := c.config.Deployment
 	retry := backoff.NewRetry(cfg.Retries, backoff.NewConstant(cfg.RetryInterval.Duration()))
 
-	var doneNewlyCompleted, doneNewlyCreated bool
+	var doneNewlyCreated bool
 
 	for retry.WaitNext(ctx) {
 		// if !doneNewlyCompleted {
@@ -170,7 +170,7 @@ func (c *Collector) collectDeploymentMetrics(ctx context.Context) {
 			}
 		}
 
-		if doneNewlyCompleted && doneNewlyCreated {
+		if doneNewlyCreated {
 			return
 		}
 		c.logger.Info("will do another try to collect insight data")
@@ -188,7 +188,10 @@ func (c *Collector) processNewlyCreatedDeployments(ctx context.Context) error {
 			c.logger.Error("failed to load milestone", zap.Error(err))
 			return err
 		}
-		m = &insight.Milestone{}
+		m = &insight.Milestone{
+			// collect from 1 week ago.
+			DeploymentCreatedAtMilestone: targetDate.Add(-time.Hour * 24 * 7).Unix(),
+		}
 	}
 
 	dc, err := c.findDeploymentsCreatedInRange(ctx, m.DeploymentCreatedAtMilestone, targetDate.Unix())

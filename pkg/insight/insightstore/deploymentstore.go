@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/gogo/protobuf/proto"
 	"github.com/pipe-cd/pipecd/pkg/filestore"
 	"github.com/pipe-cd/pipecd/pkg/model"
+	"google.golang.org/protobuf/proto"
 )
 
 var (
@@ -19,12 +19,13 @@ var (
 
 const (
 	maxChunkByteSize = 1 * 1024 * 1024
+	metaFileName     = "meta.proto.bin"
 )
 
 type DeploymentStore interface {
 	GetDailyDeployments(ctx context.Context, projectID string, date_rage *model.ChunkDateRange) ([]*model.DailyDeployment, error)
 
-	PutDailyDeployment(ctx context.Context, projectID string, chunk *model.DailyDeployment) error
+	PutDailyDeployment(ctx context.Context, projectID string, deployments *model.DailyDeployment) error
 }
 
 func (s *store) GetDailyDeployments(ctx context.Context, projectID string, date_range *model.ChunkDateRange) ([]*model.DailyDeployment, error) {
@@ -40,7 +41,7 @@ func (s *store) GetDailyDeployments(ctx context.Context, projectID string, date_
 
 	dirPath := determineDeploymentDirPath(fromYear, projectID)
 	meta := model.DeploymentChunkMetaData{}
-	err := s.loadProtoMessage(ctx, fmt.Sprintf("%s/meta.json", dirPath), &meta)
+	err := s.loadProtoMessage(ctx, fmt.Sprintf("%s/%s", dirPath, metaFileName), &meta)
 	if err != nil {
 		return nil, err
 	}
@@ -49,13 +50,8 @@ func (s *store) GetDailyDeployments(ctx context.Context, projectID string, date_
 
 	var result []*model.DailyDeployment
 	for _, key := range keys {
-		rawData, err := s.filestore.Get(ctx, fmt.Sprintf("%s/%s", dirPath, key))
-		if err != nil {
-			return nil, err
-		}
-
 		data := model.DeploymentChunk{}
-		err = proto.Unmarshal(rawData, &data)
+		err := s.loadProtoMessage(ctx, fmt.Sprintf("%s/%s", dirPath, key), &data)
 		if err != nil {
 			return nil, err
 		}
@@ -71,7 +67,7 @@ func (s *store) PutDailyDeployment(ctx context.Context, projectID string, dailyD
 	year := time.Unix(dailyDeployments.Date, 0).Year()
 	dirPath := determineDeploymentDirPath(year, projectID)
 	meta := model.DeploymentChunkMetaData{}
-	metaPath := fmt.Sprintf("%s/meta.json", dirPath)
+	metaPath := fmt.Sprintf("%s/%s", dirPath, metaFileName)
 	err := s.loadProtoMessage(ctx, metaPath, &meta)
 	if err != nil && !errors.Is(err, filestore.ErrNotFound) {
 		return err
@@ -148,9 +144,7 @@ func (s *store) PutDailyDeployment(ctx context.Context, projectID string, dailyD
 		latestChunkMeta.ChunkSize = size
 		latestChunkMeta.DateRange.To = dailyDeployments.Date
 		_, err = s.storeProtoMessage(ctx, chunkPath, &meta)
-		if err != nil {
-			return err
-		}
+		return err
 	}
 
 	// Create new meta and chunk
@@ -225,8 +219,10 @@ func overlap(lhs *model.ChunkDateRange, rhs *model.ChunkDateRange) bool {
 
 func extractDailyDeploymentFromChunk(chunk *model.DeploymentChunk, date_range *model.ChunkDateRange) []*model.DailyDeployment {
 	var result []*model.DailyDeployment
+	from := date_range.From
+	to := time.Unix(date_range.To, 0).AddDate(0, 0, 1).Unix()
 	for _, d := range chunk.Deployments {
-		if date_range.From < d.Date && d.Date < date_range.To {
+		if from <= d.Date && d.Date < to {
 			result = append(result, d)
 		}
 	}

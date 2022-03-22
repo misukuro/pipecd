@@ -46,17 +46,25 @@ const limit = 50
 // }
 
 func (c *Collector) collectDevelopmentFrequency(ctx context.Context, ds []*model.Deployment, target time.Time) error {
-	dailyDeployments := groupDeployments(ds)
+	dailyDeployments := groupDeploymentByProjectID(ds)
 
-	var updateErr error
-	for _, d := range dailyDeployments {
-
+	for projectID, deployments := range dailyDeployments {
+		for _, deployment := range deployments {
+			err := c.insightstore.PutDailyDeployment(ctx, projectID, deployment)
+			if err != nil {
+				return err
+			}
+		}
 	}
 
-	return updateErr
+	return nil
 }
 
 func (c *Collector) findDeploymentsCreatedInRange(ctx context.Context, from, to int64) ([]*model.Deployment, error) {
+	if from > to {
+		return []*model.Deployment{}, nil
+	}
+
 	filters := []datastore.ListFilter{
 		{
 			Field:    "CreatedAt",
@@ -100,9 +108,8 @@ func (c *Collector) findDeploymentsCreatedInRange(ctx context.Context, from, to 
 	return deployments, nil
 }
 
-// groupDeployments groups deployments by applicationID and projectID
-// deployments must be sorted by createdAt ASC.
-// Result is sorted by DailyDeployment.Date ASC.
+// sorted by DailyDeployment.Date ASC
+// order of DailyDeployment.DailyDeployments is depend on input.
 func groupDeployments(deployments []*model.Deployment) []*model.DailyDeployment {
 	dailyDeployments := make(map[int64]*model.DailyDeployment)
 
@@ -139,5 +146,18 @@ func groupDeployments(deployments []*model.Deployment) []*model.DailyDeployment 
 		return result[i].Date < result[j].Date
 	})
 
+	return result
+}
+
+func groupDeploymentByProjectID(deployments []*model.Deployment) map[string][]*model.DailyDeployment {
+	groupById := make(map[string][]*model.Deployment)
+	for _, d := range deployments {
+		groupById[d.ProjectId] = append(groupById[d.ProjectId], d)
+	}
+
+	result := make(map[string][]*model.DailyDeployment)
+	for projectID, d := range groupById {
+		result[projectID] = groupDeployments(d)
+	}
 	return result
 }

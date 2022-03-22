@@ -634,6 +634,10 @@ func (x *DeploymentChunkMetaData) GetData() []*DeploymentChunkMetaData_ChunkData
 	return nil
 }
 
+// from and to is must be normalized like xxxx/xx/xx:00:00:00;
+// ChunkDateRange means date range [from, to].
+// if from is 1647820800(2022/03/21:00:00:00) and to is 1647907200(2022/03/22:00:00:00),
+// this means 2022/03/21:00:00:00 ~ 2022/03/22:23:59:59. (note that 2022/03/22 is included)
 type ChunkDateRange struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
