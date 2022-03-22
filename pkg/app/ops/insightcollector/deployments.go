@@ -60,6 +60,7 @@ func (c *Collector) collectDevelopmentFrequency(ctx context.Context, ds []*model
 	return nil
 }
 
+// returned deployments are sorted by CreatedAt DESC
 func (c *Collector) findDeploymentsCreatedInRange(ctx context.Context, from, to int64) ([]*model.Deployment, error) {
 	if from > to {
 		return []*model.Deployment{}, nil

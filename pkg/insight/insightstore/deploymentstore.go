@@ -143,7 +143,7 @@ func (s *store) PutDailyDeployment(ctx context.Context, projectID string, dailyD
 		// Update meta
 		latestChunkMeta.ChunkSize = size
 		latestChunkMeta.DateRange.To = dailyDeployments.Date
-		_, err = s.storeProtoMessage(ctx, chunkPath, &meta)
+		_, err = s.storeProtoMessage(ctx, metaPath, &meta)
 		return err
 	}
 

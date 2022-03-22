@@ -45,9 +45,8 @@ type Collector struct {
 	deploymentStore  deploymentStore
 	insightstore     insightstore.Store
 
-	applicationsHandlers              []func(ctx context.Context, applications []*model.Application, target time.Time) error
-	newlyCreatedDeploymentsHandlers   []func(ctx context.Context, developments []*model.Deployment, target time.Time) error
-	newlyCompletedDeploymentsHandlers []func(ctx context.Context, developments []*model.Deployment, target time.Time) error
+	applicationsHandlers            []func(ctx context.Context, applications []*model.Application, target time.Time) error
+	newlyCreatedDeploymentsHandlers []func(ctx context.Context, developments []*model.Deployment, target time.Time) error
 
 	config config.ControlPlaneInsightCollector
 	logger *zap.Logger

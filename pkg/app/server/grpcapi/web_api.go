@@ -38,6 +38,7 @@ import (
 	"github.com/pipe-cd/pipecd/pkg/config"
 	"github.com/pipe-cd/pipecd/pkg/datastore"
 	"github.com/pipe-cd/pipecd/pkg/filestore"
+	"github.com/pipe-cd/pipecd/pkg/insight"
 	"github.com/pipe-cd/pipecd/pkg/insight/insightstore"
 	"github.com/pipe-cd/pipecd/pkg/model"
 	"github.com/pipe-cd/pipecd/pkg/rpc/rpcauth"
@@ -1381,9 +1382,12 @@ func (a *WebAPI) GetInsightData(ctx context.Context, req *webservice.GetInsightD
 
 	switch req.MetricsKind {
 	case model.InsightMetricsKind_DEPLOYMENT_FREQUENCY:
+		from := insight.NormalizeUnixTime(req.RangeFrom)
+		to := insight.NormalizeUnixTime(req.RangeTo)
+
 		points, updatedAt, err := a.getDeploymentFrequency(ctx, claims.Role.ProjectId, &model.ChunkDateRange{
-			From: req.RangeFrom,
-			To:   req.RangeTo,
+			From: from,
+			To:   to,
 		})
 		if err != nil {
 			return nil, err
