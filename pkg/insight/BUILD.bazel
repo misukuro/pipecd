@@ -4,9 +4,6 @@ go_library(
     name = "go_default_library",
     srcs = [
         "applicationcount.go",
-        "chunk.go",
-        "datapoint.go",
-        "filepath.go",
         "milestone.go",
         "utils.go",
     ],
@@ -20,9 +17,6 @@ go_test(
     size = "small",
     srcs = [
         "applicationcount_test.go",
-        "chunk_test.go",
-        "datapoint_test.go",
-        "filepath_test.go",
         "utils_test.go",
     ],
     embed = [":go_default_library"],
